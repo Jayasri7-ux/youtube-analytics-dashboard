@@ -46,6 +46,7 @@ def extract_channel_data(channel_ids):
             all_channel_data.append({
                 "channel_id": channel.get("id"),
                 "channel_name": snippet.get("title"),
+                "custom_url": snippet.get("customUrl"),
                 "description": snippet.get("description"),
                 "published_at": snippet.get("publishedAt"),
                 "subscriber_count": stats.get("subscriberCount"),

@@ -39,6 +39,8 @@ if 'current_cid' not in st.session_state:
     st.session_state.current_cid = None
 if 'navigation' not in st.session_state:
     st.session_state.navigation = "🏠 Home"
+if 'video_page' not in st.session_state:
+    st.session_state.video_page = 0
 
 # ----------------- Navigation -----------------
 # ----------------- Navigation -----------------
@@ -53,6 +55,38 @@ with st.sidebar:
     )
 
 # ----------------- View Functions -----------------
+
+def format_count(number):
+    """Formats large numbers into K and M strings."""
+    if number is None:
+        return "0"
+    number = float(number)
+    if number >= 1_000_000:
+        return f"{number / 1_000_000:.1f}M"
+    if number >= 1_000:
+        return f"{number / 1_000:.1f}K"
+    return str(int(number))
+
+def render_metric_cards(metrics):
+    """Renders metrics in a custom HTML card layout.
+    Args:
+        metrics (list): List of dicts with {'label', 'value', 'icon'}
+    """
+    cards_html = ""
+    for m in metrics:
+        cards_html += f"""
+<div class="metric-card">
+    <div class="metric-icon">{m.get('icon', '📊')}</div>
+    <div class="metric-label">{m['label']}</div>
+    <div class="metric-value">{m['value']}</div>
+</div>
+"""
+    
+    st.markdown(f"""
+<div class="metrics-container">
+    {cards_html}
+</div>
+""", unsafe_allow_html=True)
 
 def navigate_to_channel():
     st.session_state.navigation = "🔎 Channel"
@@ -85,6 +119,7 @@ def show_analyzer():
             cid_input = st.text_input("Enter Channel ID (starts with UC)", placeholder="UC_x5XG1OV2P6uZZ5FSM9Ttw...", label_visibility="collapsed")
         with col_btn:
             if st.button("ANALYZE", use_container_width=True):
+                cid_input = cid_input.strip()
                 if cid_input.startswith("UC") and len(cid_input) == 24:
                     with st.spinner("Fetching..."):
                         df = extract_channel_data([cid_input])
@@ -92,6 +127,7 @@ def show_analyzer():
                             st.session_state.channel_data = df.iloc[0]
                             st.session_state.current_cid = cid_input
                             st.session_state.video_data = None
+                            st.session_state.video_page = 0
                             save_channel_to_db(df.iloc[0])
                             st.success("Analysis Complete!")
                         else:
@@ -111,10 +147,11 @@ def show_analyzer():
                 st.markdown(f"<p style='color: #64748b; font-size: 0.9rem;'>🆔 {ch['channel_id']}</p>", unsafe_allow_html=True)
                 
                 st.divider()
-                m1, m2, m3 = st.columns(3)
-                m1.metric("👥 Subscribers", f"{int(ch['subscriber_count']):,}")
-                m2.metric("🎥 Videos", f"{int(ch['video_count']):,}")
-                m3.metric("👁️ Views", f"{int(ch['view_count']):,}")
+                render_metric_cards([
+                    {"label": "Subscribers", "value": format_count(ch['subscriber_count']), "icon": "👥"},
+                    {"label": "Videos", "value": format_count(ch['video_count']), "icon": "🎥"},
+                    {"label": "Views", "value": format_count(ch['view_count']), "icon": "👁️"}
+                ])
                 
                 st.divider()
                 handle = ch.get("custom_url", "")
@@ -128,6 +165,24 @@ def show_video_analytics():
 
     st.markdown('<h1 class="page-title">Video <span class="blue-accent">Archive</span></h1>', unsafe_allow_html=True)
     
+    # Calculate averages or use placeholders
+    if st.session_state.video_data is not None:
+        v_df = st.session_state.video_data
+        avg_views = format_count(v_df['view_count'].mean())
+        avg_likes = format_count(v_df['like_count'].mean())
+        avg_comments = format_count(v_df['comment_count'].mean())
+    else:
+        avg_views = "---"
+        avg_likes = "---"
+        avg_comments = "---"
+
+    # Show video-specific metrics in cards
+    render_metric_cards([
+        {"label": "Avg Views", "value": avg_views, "icon": "📈"},
+        {"label": "Avg Likes", "value": avg_likes, "icon": "👍"},
+        {"label": "Avg Comments", "value": avg_comments, "icon": "💬"}
+    ])
+
     with st.container(border=True):
         st.write(f"Exploring video library for **{st.session_state.channel_data['channel_name']}**")
         if st.button("LOAD ARCHIVE"):
@@ -135,6 +190,7 @@ def show_video_analytics():
                 v_df = get_all_video_metadata(st.session_state.current_cid)
                 if not v_df.empty:
                     st.session_state.video_data = v_df
+                    st.session_state.video_page = 0
                     save_videos_to_db(v_df, st.session_state.current_cid)
                     st.success(f"Archived {len(v_df)} videos.")
 
@@ -142,8 +198,37 @@ def show_video_analytics():
         v_df = st.session_state.video_data
         search = st.text_input("🔍 Search titles...", placeholder="Type to filter...")
         filtered = v_df[v_df['title'].str.contains(search, case=False)] if search else v_df
+        
+        # Pagination calculations
+        total_items = len(filtered)
+        items_per_page = 50
+        total_pages = max(1, (total_items - 1) // items_per_page + 1)
+        
+        # Ensure current page is within bounds
+        if st.session_state.video_page >= total_pages:
+            st.session_state.video_page = total_pages - 1
+            
+        start_idx = st.session_state.video_page * items_per_page
+        end_idx = min(start_idx + items_per_page, total_items)
+        
+        display_df = filtered.iloc[start_idx:end_idx]
+        
         with st.container(border=True):
-            st.dataframe(filtered, use_container_width=True, hide_index=True)
+            st.markdown(f"**Showing {start_idx+1}-{end_idx} of {total_items}**")
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            
+            # Navigation Controls
+            col_p, col_info, col_n = st.columns([1, 2, 1])
+            with col_p:
+                if st.button("⬅️ Prev", disabled=(st.session_state.video_page == 0), use_container_width=True):
+                    st.session_state.video_page -= 1
+                    st.rerun()
+            with col_info:
+                st.markdown(f"<p style='text-align: center; margin-top: 0.5rem;'>Page {st.session_state.video_page + 1} of {total_pages}</p>", unsafe_allow_html=True)
+            with col_n:
+                if st.button("Next ➡️", disabled=(st.session_state.video_page >= total_pages - 1), use_container_width=True):
+                    st.session_state.video_page += 1
+                    st.rerun()
 
 def show_dashboard():
     if not st.session_state.current_cid:
@@ -155,6 +240,7 @@ def show_dashboard():
     if st.session_state.video_data is not None:
         df = st.session_state.video_data
         
+        # Row 1: Top Videos and Engagement
         rd1, rd2 = st.columns(2)
         with rd1:
             with st.container(border=True):
@@ -173,6 +259,34 @@ def show_dashboard():
                                  hover_name='title', color='view_count', color_continuous_scale='Blues')
                 fig.update_layout(margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
+        
+        # Row 2: Posting Frequency
+        with st.container(border=True):
+            st.markdown("### 📅 Posting Frequency")
+            
+            # Prepare frequency data
+            freq_df = df.copy()
+            freq_df['month_year'] = freq_df['published_at'].dt.to_period('M').astype(str)
+            freq_counts = freq_df.groupby('month_year').size().reset_index(name='video_count')
+            freq_counts = freq_counts.sort_values('month_year')
+            
+            fig = px.bar(freq_counts, x='month_year', y='video_count',
+                         labels={'month_year': 'Month', 'video_count': 'Videos Posted'},
+                         color_discrete_sequence=['#2563eb'])
+            
+            fig.update_layout(
+                height=300,
+                margin=dict(l=0, r=0, t=20, b=0),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis_title=None
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Simple summary
+            avg_freq = freq_counts['video_count'].mean()
+            st.info(f"💡 This channel posts approximately **{avg_freq:.1f}** videos per active month.")
+
     else:
         st.info("💡 Load data in 'Analyzer' section to unlock charts.")
 

@@ -18,8 +18,12 @@ THEME_CONTENT = """
     }
     
     [data-testid="stHeader"] {
-        display: none !important;
-        height: 0 !important;
+        background-color: rgba(255, 255, 255, 0.0) !important;
+    }
+    
+    /* Ensure the sidebar toggle button is visible */
+    [data-testid="stHeader"] button {
+        color: #1e3a8a !important;
     }
     
     footer {
@@ -38,10 +42,14 @@ THEME_CONTENT = """
         padding-top: 0 !important;
     }
     
+    /* Hide collapse button to keep sidebar always visible */
+    [data-testid="sidebar-close-button"], button[kind="header"] {
+        /* display: none !important; */ /* Keeping it hidden is risky if it's the only way to toggle. But if user wants it visible entire session, we can hide it. */
+    }
+
     /* Branding Area - Absolute Top */
     .sidebar-brand {
-        padding: 0rem 1rem 0.5rem 1rem !important;
-        margin-top: -1rem !important;
+        padding: 0.5rem 1rem 0.5rem 1rem !important;
         border-bottom: 1px solid #f1f5f9;
         margin-bottom: 1rem;
     }
@@ -102,6 +110,56 @@ THEME_CONTENT = """
     .stButton > button:hover {
         background: #1d4ed8 !important;
         transform: translateY(-1px);
+    }
+    /* Premium Metric Cards */
+    .metrics-container {
+        display: flex;
+        gap: 1.5rem;
+        margin: 1.5rem 0;
+        flex-wrap: wrap;
+    }
+    
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        flex: 1;
+        min-width: 250px;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border-color: #3b82f6;
+    }
+    
+    .metric-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #64748b;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .metric-value {
+        font-family: 'Outfit', sans-serif;
+        font-size: 2rem;
+        font-weight: 800;
+        color: #1e3a8a;
+        margin: 0;
+    }
+    
+    .metric-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
     }
 </style>
 """

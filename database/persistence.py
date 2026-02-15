@@ -1,4 +1,4 @@
-from database.db_config import SessionLocal
+from database.db_connection import SessionLocal
 from database.models import Channel, Video, VideoStatistics
 from datetime import datetime
 import pandas as pd
@@ -17,12 +17,12 @@ def save_channel_to_db(channel_data_row):
             db.add(channel)
             
         channel.channel_name = channel_data_row['channel_name']
-        channel.custom_url = channel_data_row.get('custom_url')
         channel.description = channel_data_row.get('description')
-        channel.published_at = pd.to_datetime(channel_data_row['published_at'])
-        channel.subscriber_count = int(channel_data_row['subscriber_count'])
-        channel.video_count = int(channel_data_row['video_count'])
-        channel.view_count = int(channel_data_row['view_count'])
+        channel.created_date = pd.to_datetime(channel_data_row['created_date'])
+        channel.subscribers = int(channel_data_row['subscribers'])
+        channel.total_videos = int(channel_data_row['total_videos'])
+        channel.total_views = int(channel_data_row['total_views'])
+        channel.thumbnail_url = channel_data_row.get('thumbnail_url')
         
         db.commit()
     except Exception as e:
@@ -46,22 +46,60 @@ def save_videos_to_db(video_df, channel_id):
                 
             video.title = row['title']
             video.description = row.get('description', '')
-            video.published_at = pd.to_datetime(row['published_at'])
-            # Duration is expected to be parsed already in video_extractor
-            video.duration_seconds = int(row.get('duration_seconds', 0))
+            video.publish_date = pd.to_datetime(row['publish_date'])
+            video.duration = int(row.get('duration', 0))
+            video.thumbnail_url = row.get('thumbnail_url')
             
-            # Add new statistics record
-            stats = VideoStatistics(
-                video_id=video_id,
-                view_count=int(row['view_count']),
-                like_count=int(row['like_count']),
-                comment_count=int(row['comment_count'])
-            )
-            db.add(stats)
+            # 1 to 1 Statistics: Check if stats exist
+            stats = db.query(VideoStatistics).filter(VideoStatistics.video_id == video_id).first()
+            if not stats:
+                stats = VideoStatistics(video_id=video_id)
+                db.add(stats)
+            
+            # Update dynamic statistics
+            stats.views = int(row['view_count'])
+            stats.likes = int(row['like_count'])
+            stats.comments = int(row['comment_count'])
             
         db.commit()
     except Exception as e:
         print(f"Error saving videos to DB: {e}")
         db.rollback()
+    finally:
+        db.close()
+
+def get_videos_from_db(channel_id):
+    """Retrieves all videos and their latest statistics for a channel from the database."""
+    db = SessionLocal()
+    try:
+        # One-to-one relationship simplifies the query
+        results = db.query(Video, VideoStatistics).\
+            join(VideoStatistics, Video.video_id == VideoStatistics.video_id).\
+            filter(Video.channel_id == channel_id).all()
+
+        if not results:
+            return pd.DataFrame()
+
+        video_list = []
+        for video, stats in results:
+            video_list.append({
+                "video_id": video.video_id,
+                "title": video.title,
+                "description": video.description,
+                "published_at": video.publish_date,
+                "duration_seconds": video.duration,
+                "view_count": stats.views,
+                "like_count": stats.likes,
+                "comment_count": stats.comments
+            })
+        
+        df = pd.DataFrame(video_list)
+        if not df.empty:
+            df['published_at'] = pd.to_datetime(df['published_at'])
+            
+        return df
+    except Exception as e:
+        print(f"Error loading videos from DB: {e}")
+        return pd.DataFrame()
     finally:
         db.close()

@@ -78,14 +78,12 @@ def get_all_video_metadata(channel_id):
                     "video_id": video.get("id"),
                     "title": snippet.get("title"),
                     "description": snippet.get("description"),
-                    "published_at": snippet.get("publishedAt"),
-                    "duration_seconds": duration_seconds,
+                    "publish_date": snippet.get("publishedAt"),
+                    "duration": duration_seconds,
                     "view_count": stats.get("viewCount"),
                     "like_count": stats.get("likeCount"),
                     "comment_count": stats.get("commentCount"),
-                    "thumbnail_default": snippet.get("thumbnails", {}).get("default", {}).get("url"),
-                    "thumbnail_medium": snippet.get("thumbnails", {}).get("medium", {}).get("url"),
-                    "thumbnail_high": snippet.get("thumbnails", {}).get("high", {}).get("url"),
+                    "thumbnail_url": snippet.get("thumbnails", {}).get("high", {}).get("url"),
                 })
 
         # 4. Process data into a DataFrame
@@ -93,12 +91,12 @@ def get_all_video_metadata(channel_id):
 
         if not df.empty:
             # Type conversions for numerical fields
-            numeric_cols = ["duration_seconds", "view_count", "like_count", "comment_count"]
+            numeric_cols = ["duration", "view_count", "like_count", "comment_count"]
             for col in numeric_cols:
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
             
-            # Convert published_at to datetime
-            df["published_at"] = pd.to_datetime(df["published_at"])
+            # Convert publish_date to datetime
+            df["publish_date"] = pd.to_datetime(df["publish_date"])
 
         return df
 

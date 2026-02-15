@@ -14,7 +14,7 @@ if str(root_path) not in sys.path:
 from streamlit_app.youtube_auth import get_youtube_service
 from data_processing.channel_extractor import extract_channel_data
 from data_processing.video_extractor import get_all_video_metadata
-from database.persistence import save_channel_to_db, save_videos_to_db
+from database.persistence import save_channel_to_db, save_videos_to_db, get_videos_from_db
 from database.db_config import SessionLocal
 from database.models import Channel, Video, VideoStatistics
 
@@ -141,16 +141,16 @@ def show_analyzer():
         with st.container(border=True):
             c1, c2 = st.columns([1, 4])
             with c1:
-                st.image(ch["thumbnail_high"], use_container_width=True)
+                st.image(ch["thumbnail_url"], use_container_width=True)
             with c2:
                 st.markdown(f"<h2 style='margin: 0;'>{ch['channel_name']}</h2>", unsafe_allow_html=True)
                 st.markdown(f"<p style='color: #64748b; font-size: 0.9rem;'>🆔 {ch['channel_id']}</p>", unsafe_allow_html=True)
                 
                 st.divider()
                 render_metric_cards([
-                    {"label": "Subscribers", "value": format_count(ch['subscriber_count']), "icon": "👥"},
-                    {"label": "Videos", "value": format_count(ch['video_count']), "icon": "🎥"},
-                    {"label": "Views", "value": format_count(ch['view_count']), "icon": "👁️"}
+                    {"label": "Subscribers", "value": format_count(ch['subscribers']), "icon": "👥"},
+                    {"label": "Videos", "value": format_count(ch['total_videos']), "icon": "🎥"},
+                    {"label": "Views", "value": format_count(ch['total_views']), "icon": "👁️"}
                 ])
                 
                 st.divider()
@@ -165,6 +165,13 @@ def show_video_analytics():
 
     st.markdown('<h1 class="page-title">Video <span class="blue-accent">Archive</span></h1>', unsafe_allow_html=True)
     
+    # Auto-load from DB if not already in session state
+    if st.session_state.video_data is None:
+        v_db = get_videos_from_db(st.session_state.current_cid)
+        if not v_db.empty:
+            st.session_state.video_data = v_db
+            st.rerun()
+
     # Calculate averages or use placeholders
     if st.session_state.video_data is not None:
         v_df = st.session_state.video_data
@@ -192,7 +199,12 @@ def show_video_analytics():
                     st.session_state.video_data = v_df
                     st.session_state.video_page = 0
                     save_videos_to_db(v_df, st.session_state.current_cid)
-                    st.success(f"Archived {len(v_df)} videos.")
+                    st.session_state.last_archive_count = len(v_df)
+                    st.rerun()
+
+    if 'last_archive_count' in st.session_state:
+        st.success(f"Archived {st.session_state.last_archive_count} videos.")
+        del st.session_state.last_archive_count
 
     if st.session_state.video_data is not None:
         v_df = st.session_state.video_data
@@ -266,7 +278,7 @@ def show_dashboard():
             
             # Prepare frequency data
             freq_df = df.copy()
-            freq_df['month_year'] = freq_df['published_at'].dt.to_period('M').astype(str)
+            freq_df['month_year'] = freq_df['publish_date'].dt.to_period('M').astype(str)
             freq_counts = freq_df.groupby('month_year').size().reset_index(name='video_count')
             freq_counts = freq_counts.sort_values('month_year')
             

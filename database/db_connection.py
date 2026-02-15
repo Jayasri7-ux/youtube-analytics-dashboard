@@ -2,11 +2,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from pathlib import Path
 import logging
+
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -17,21 +16,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default to SQLite for local development if no DB_URL is provided
+# Default to SQLite for local development if no DATABASE_URL is provided
 db_file = DATA_DIR / "youtube_analytics.db"
-# Use 3 slashes for standard absolute path on Windows
 db_path = db_file.resolve().as_posix()
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{db_path}")
 
 # Log the connection attempt for debugging
 logger.info(f"Connecting to database at: {DATABASE_URL}")
 
-# Added connect_args for SQLite multi-threading support in Streamlit
+# Create engine with SQLite multi-threading support if applicable
 engine = create_engine(
     DATABASE_URL, 
     echo=False,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():

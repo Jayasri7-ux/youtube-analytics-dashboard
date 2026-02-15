@@ -46,15 +46,12 @@ def extract_channel_data(channel_ids):
             all_channel_data.append({
                 "channel_id": channel.get("id"),
                 "channel_name": snippet.get("title"),
-                "custom_url": snippet.get("customUrl"),
                 "description": snippet.get("description"),
-                "published_at": snippet.get("publishedAt"),
-                "subscriber_count": stats.get("subscriberCount"),
-                "video_count": stats.get("videoCount"),
-                "view_count": stats.get("viewCount"),
-                "thumbnail_default": thumbnails.get("default", {}).get("url"),
-                "thumbnail_medium": thumbnails.get("medium", {}).get("url"),
-                "thumbnail_high": thumbnails.get("high", {}).get("url"),
+                "created_date": snippet.get("publishedAt"),
+                "subscribers": stats.get("subscriberCount"),
+                "total_videos": stats.get("videoCount"),
+                "total_views": stats.get("viewCount"),
+                "thumbnail_url": thumbnails.get("high", {}).get("url"),
             })
 
         return pd.DataFrame(all_channel_data)

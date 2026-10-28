@@ -9,3 +9,4 @@ GitPython
 Jinja2
 plotly
 python-dotenv
+isodate

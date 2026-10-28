@@ -10,3 +10,5 @@ Jinja2
 plotly
 python-dotenv
 isodate
+sqlalchemy
+psycopg2-binary

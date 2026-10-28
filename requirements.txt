@@ -8,3 +8,4 @@ google-auth-httplib2
 GitPython
 Jinja2
 plotly
+python-dotenv
